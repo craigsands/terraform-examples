@@ -149,6 +149,11 @@ resource "aws_transfer_server" "example" {
   }
 }
 
+resource "aws_cloudwatch_log_group" "example" {
+  # While this gets created automatically, defining it allows it to be destroyed.
+  name = "/aws/transfer/${aws_transfer_server.example.id}"
+}
+
 resource "aws_iam_role" "user" {
   name_prefix = "transfer-user-"
   assume_role_policy = templatefile(
