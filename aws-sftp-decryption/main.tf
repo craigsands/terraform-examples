@@ -9,7 +9,8 @@ provider "local" {}
 provider "tls" {}
 
 resource "aws_s3_bucket" "example" {
-  bucket = "transfer-test-bucket-${local.account_id}"
+  bucket        = "transfer-test-bucket-${local.account_id}"
+  force_destroy = true
 }
 
 resource "aws_security_group" "allow_sftp" {
@@ -199,8 +200,8 @@ resource "aws_transfer_ssh_key" "example" {
 }
 
 resource "local_sensitive_file" "private_key" {
-  content         = tls_private_key.example.private_key_openssh
-  filename        = "${path.module}/id_rsa"
+  content  = tls_private_key.example.private_key_openssh
+  filename = "${path.module}/id_rsa"
 }
 
 resource "aws_secretsmanager_secret" "example" {
