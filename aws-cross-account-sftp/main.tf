@@ -1,9 +1,9 @@
 provider "aws" {
-  alias   = "remote"
+  alias = "remote"
 }
 
 provider "aws" {
-  alias   = "local"
+  alias = "local"
 }
 
 data "aws_caller_identity" "local" {
@@ -109,7 +109,7 @@ resource "aws_s3_bucket_policy" "allow_local_access_to_remote" {
         {
           "Effect": "Allow",
           "Principal": {
-            "AWS": ["${local.local_account_id}"]
+            "AWS": ["${module.local_user.iam_role_arn}"]
           },
           "Action": [
             "s3:ListBucket",
@@ -122,7 +122,7 @@ resource "aws_s3_bucket_policy" "allow_local_access_to_remote" {
         {
           "Effect": "Allow",
           "Principal": {
-            "AWS": ["${local.local_account_id}"]
+            "AWS": ["${module.local_user.iam_role_arn}"]
           },
           "Action": [
             "s3:GetObject",
