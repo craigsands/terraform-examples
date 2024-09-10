@@ -52,12 +52,27 @@ resource "terraform_data" "decrypt" {
   triggers_replace = [timestamp()]
 
   provisioner "local-exec" {
+    # download the file from the same region as the bucket
+    command = <<-EOF
+      echo "$(
+        aws s3 cp \
+          --region ${aws_s3_bucket.example.region} \
+          s3://${aws_s3_bucket.example.id}/${aws_s3_object.example.key} \
+          - \
+          --debug 2> ${aws_s3_bucket.example.region}.log
+      )"
+    EOF
+  }
+
+  provisioner "local-exec" {
+    # download the file from an alternative region from the bucket
     command = <<-EOF
       echo "$(
         aws s3 cp \
           --region ${data.aws_region.use2.name} \
           s3://${aws_s3_bucket.example.id}/${aws_s3_object.example.key} \
-          -
+          - \
+          --debug 2> ${data.aws_region.use2.name}.log
       )"
     EOF
   }
