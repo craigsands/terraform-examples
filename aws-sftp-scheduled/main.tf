@@ -15,7 +15,11 @@ locals {
 resource "tls_private_key" "this" {
   for_each = toset(["host", "user"])
 
-  algorithm = "ED25519"
+  # The algorithm here must be RSA. When used with ED25519,
+  # the server doesn't expose the host key until after a connection is made,
+  # preventing the server and SFTP connector from being created
+  # within the same Terraform run as this example demonstrates.
+  algorithm = "RSA"
 }
 
 resource "aws_s3_bucket" "this" {
@@ -23,7 +27,7 @@ resource "aws_s3_bucket" "this" {
   force_destroy = true
 }
 
-resource "aws_s3_object" "in" {
+resource "aws_s3_object" "in_folder" {
   bucket = aws_s3_bucket.this.bucket
   key    = "in/"
 }
@@ -55,10 +59,9 @@ resource "aws_transfer_server" "this" {
   # protocols     = ["SFTP"]
   # endpoint_type = "PUBLIC"
 
-  host_key                    = trimspace(tls_private_key.this["host"].private_key_pem)
-  sftp_authentication_methods = "PUBLIC_KEY"
-  logging_role                = module.logger_role.iam_role_arn
-  force_destroy               = true # delete users along with the server
+  host_key      = trimspace(tls_private_key.this["host"].private_key_pem)
+  logging_role  = module.logger_role.iam_role_arn
+  force_destroy = true # delete users along with the server
 }
 
 resource "aws_cloudwatch_log_group" "server" {
@@ -73,7 +76,7 @@ resource "aws_secretsmanager_secret_version" "this" {
   secret_id = aws_secretsmanager_secret.this.id
   secret_string = jsonencode({
     "Username" : local.user_name,
-    "PrivateKey" : tls_private_key.this["user"].private_key_pem
+    "PrivateKey" : tls_private_key.this["user"].private_key_openssh
   })
 }
 
@@ -121,7 +124,7 @@ resource "aws_transfer_user" "this" {
 
   home_directory_type = "LOGICAL"
   home_directory_mappings {
-    entry  = "/${aws_s3_object.in.key}"
+    entry  = "/${trim(aws_s3_object.in_folder.key, "/")}"
     target = "/${aws_s3_bucket.this.id}"
   }
 }
@@ -136,13 +139,17 @@ resource "aws_transfer_connector" "this" {
   access_role  = module.connector_role.iam_role_arn
   logging_role = module.logger_role.iam_role_arn
   sftp_config {
-    trusted_host_keys = [trimspace(tls_private_key.this["host"].public_key_pem)]
+    trusted_host_keys = [trimspace(tls_private_key.this["host"].public_key_openssh)]
     user_secret_id    = aws_secretsmanager_secret.this.id
   }
   url = "sftp://${aws_transfer_server.this.endpoint}"
 
   # create the user before trying to connect
   depends_on = [aws_transfer_user.this]
+}
+
+resource "aws_cloudwatch_log_group" "connector" {
+  name = "/aws/transfer/${aws_transfer_connector.this.connector_id}"
 }
 
 module "scheduler_role" {
